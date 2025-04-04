@@ -1,9 +1,9 @@
-import 'package:exweather_app/models/weather.dart';
 import 'package:exweather_app/utils/extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import '../utils/temp_converter.dart';
+
+import 'weather.dart';
 
 class Forecast {
   final TimeOfDay lastUpdated;

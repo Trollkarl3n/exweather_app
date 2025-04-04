@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -6,12 +5,11 @@ import '../../cubit/favourite_cubit.dart';
 
 class CityInformationWidget extends StatefulWidget {
   CityInformationWidget(
-      {Key? key,
+      {super.key,
         required this.city,
         required this.sunrise,
         required this.sunset,
-        required this.isFavourite})
-      : super(key: key);
+        required this.isFavourite});
 
   final String city;
   final String sunset;

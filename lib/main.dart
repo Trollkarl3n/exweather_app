@@ -1,12 +1,10 @@
-import 'package:exweather_app/pages/home_page.dart';
-import 'package:exweather_app/services/repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import 'cubit/favourite_cubit.dart';
 import 'cubit/weather_cubit.dart';
 import 'di/initialize_dependency.dart';
-
+import 'pages/home_page.dart';
+import 'services/repository.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

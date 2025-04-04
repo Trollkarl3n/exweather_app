@@ -1,21 +1,18 @@
-import 'dart:async';
-
-import 'package:exweather_app/pages/widgets/city_entry_widget.dart';
-import 'package:exweather_app/pages/widgets/city_information_widget.dart';
-import 'package:exweather_app/pages/widgets/daily_summary_widget.dart';
-import 'package:exweather_app/pages/widgets/gradient_container_widget.dart';
-import 'package:exweather_app/pages/widgets/indicator_widget.dart';
-import 'package:exweather_app/pages/widgets/last_update_widget.dart';
-import 'package:exweather_app/pages/widgets/weather_description_widget.dart';
-import 'package:exweather_app/pages/widgets/weather_summary_widget.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../cubit/weather_cubit.dart';
 import '../models/forecast.dart';
 import '../models/weather.dart';
 import 'favourite_page.dart';
+import 'widgets/city_information_widget.dart';
+import 'widgets/city_entry_widget.dart';
+import 'widgets/daily_summary_widget.dart';
+import 'widgets/gradient_container_widget.dart';
+import 'widgets/indicator_widget.dart';
+import 'widgets/last_update_widget.dart';
+import 'widgets/weather_description_widget.dart';
+import 'widgets/weather_summary_widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
