@@ -8,13 +8,19 @@ abstract class IRepository {
 
 class Repository extends IRepository {
   final IWeatherApi weatherApi;
+
   Repository(this.weatherApi);
 
   @override
   Future<Forecast> getWeather(String city) async {
-    final location = await weatherApi.getLocation(city);
-    return await weatherApi.getWeather(location);
+    try {
+      final location = await weatherApi.getLocation(city);
+      final forecast = await weatherApi.getWeather(location);
+      forecast.city = location.city;
+      return forecast;
+    } catch (e) {
+      print("Error in repository.getWeather: $e");
+      rethrow;
+    }
   }
 }
-
-class NetworkException implements Exception {}

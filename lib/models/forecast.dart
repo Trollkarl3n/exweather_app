@@ -30,27 +30,21 @@ class Forecast {
     var weather = json['current']['weather'][0];
     var date =
     DateTime.fromMillisecondsSinceEpoch(json['current']['dt'] * 1000);
-
     var sunrise =
     DateTime.fromMillisecondsSinceEpoch(json['current']['sunrise'] * 1000);
-
     var sunset =
     DateTime.fromMillisecondsSinceEpoch(json['current']['sunset'] * 1000);
-
     bool isDay = date.isAfter(sunrise) && date.isBefore(sunset);
-
-    bool hasDaily = json['daily'] != null;
+    bool hasList = json['list'] != null;
     List<Weather> tempDaily = [];
-    if (hasDaily) {
-      List items = json['daily'];
-      tempDaily = items
-          .map((item) => Weather.fromDailyJson(item))
-          .toList()
-          .skip(1)
-          .take(7)
-          .toList();
+    if (hasList) {
+      List items = json['list'];
+      for (int i = 0; i < items.length; i += 8) {
+        if (i < items.length) {
+          tempDaily.add(Weather.fromDailyJson(items[i]));
+        }
+      }
     }
-
     var currentForcast = Weather(
         cloudiness: int.parse(json['current']['clouds'].toString()),
         temp:
@@ -63,12 +57,16 @@ class Forecast {
         date: DateFormat('d EEE').format(date),
         sunrise: DateFormat.jm().format(sunrise),
         sunset: DateFormat.jm().format(sunset));
-
+    String cityName = '';
+    if (json['city'] != null && json['city']['name'] != null) {
+      cityName = json['city']['name'];
+    }
     return Forecast(
         lastUpdated: TimeOfDay.fromDateTime(DateTime.now()),
         current: currentForcast,
         daily: tempDaily,
         isDayTime: isDay,
+        city: cityName,
         sunset: DateFormat.jm().format(sunset),
         sunrise: DateFormat.jm().format(sunrise),
         date: DateFormat('d EEE').format(date));

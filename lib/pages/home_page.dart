@@ -192,7 +192,6 @@ class _HomePageState extends State<HomePage> {
               GradientContainerWidget(color: Colors.lightBlue, child: child);
       }
     }
-
     return container;
   }
 }

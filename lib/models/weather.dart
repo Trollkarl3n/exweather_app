@@ -35,28 +35,30 @@ class Weather {
         required this.sunrise,
         required this.sunset});
 
-  static Weather fromDailyJson(dynamic daily) {
-    var cloudiness = daily['clouds'];
-    var weather = daily['weather'][0];
+  static Weather fromDailyJson(dynamic dailyForecast) {
+    var weather = dailyForecast['weather'][0];
+    var cloudiness = dailyForecast['clouds']['all'];
+    var dt = dailyForecast['dt'];
+
+    var now = DateTime.fromMillisecondsSinceEpoch(dt * 1000);
+    var sunrise = now.subtract(const Duration(hours: 6));
+    var sunset = now.add(const Duration(hours: 6));
 
     return Weather(
         condition: mapStringToWeatherCondition(weather['main'], cloudiness),
         description: weather['description'].toString().capitalize(),
         cloudiness: cloudiness,
         temp:
-        '${formatTemperature(TempConverter.kelvinToCelsius(double.parse(daily['temp']['day'].toString())))}°',
+        '${formatTemperature(TempConverter.kelvinToCelsius(double.parse(dailyForecast['main']['temp'].toString())))}°',
         date: DateFormat('d EEE')
-            .format(DateTime.fromMillisecondsSinceEpoch(daily['dt'] * 1000)),
-        sunrise: DateFormat.jm().format(
-            DateTime.fromMillisecondsSinceEpoch(daily['sunrise'] * 1000)),
-        sunset: DateFormat.jm().format(
-            DateTime.fromMillisecondsSinceEpoch(daily['sunset'] * 1000)),
+            .format(DateTime.fromMillisecondsSinceEpoch(dt * 1000)),
+        sunrise: DateFormat.jm().format(sunrise),
+        sunset: DateFormat.jm().format(sunset),
         feelLikeTemp:
-        '${formatTemperature(TempConverter.kelvinToCelsius(double.parse(daily['feels_like']['day'].toString())))}°');
+        '${formatTemperature(TempConverter.kelvinToCelsius(double.parse(dailyForecast['main']['feels_like'].toString())))}°');
   }
 
   static String formatTemperature(double t) {
-    // ignore: unnecessary_null_comparison
     var temp = (t == null ? '' : t.round().toString());
     return temp;
   }
