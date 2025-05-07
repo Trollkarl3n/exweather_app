@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../../cubit/favourite_cubit.dart';
 
 class CityInformationWidget extends StatefulWidget {
-  CityInformationWidget(
-      {super.key,
-        required this.city,
-        required this.sunrise,
-        required this.sunset,
-        required this.isFavourite});
+  const CityInformationWidget({
+    super.key,
+    required this.city,
+    required this.sunrise,
+    required this.sunset,
+  });
 
   final String city;
   final String sunset;
   final String sunrise;
-  bool isFavourite;
 
   @override
   _CityInformationWidgetState createState() => _CityInformationWidgetState();
@@ -25,8 +23,10 @@ class _CityInformationWidgetState extends State<CityInformationWidget> {
 
   @override
   void initState() {
-    isFavourite = widget.isFavourite;
     super.initState();
+    // Optionally check initial favorite state if needed
+    final favCubit = context.read<FavouriteCubit>();
+    isFavourite = favCubit.isFavorite(widget.city);
   }
 
   @override
@@ -34,28 +34,32 @@ class _CityInformationWidgetState extends State<CityInformationWidget> {
     return Column(children: [
       Row(mainAxisAlignment: MainAxisAlignment.end, children: [
         Container(
-            padding: const EdgeInsets.only(right: 5),
-            child: IconButton(
-              onPressed: () {
-                isFavourite
-                    ? BlocProvider.of<FavouriteCubit>(context)
-                    .deleteFavorite(widget.city)
-                    : BlocProvider.of<FavouriteCubit>(context)
-                    .addFavorite(widget.city);
-                setState(() {
-                  isFavourite ? isFavourite = false : isFavourite = true;
-                });
-              },
-              icon: Icon(isFavourite ? Icons.favorite : Icons.favorite_border,
-                  color: Colors.white),
-            ))
+          padding: const EdgeInsets.only(right: 5),
+          child: IconButton(
+            onPressed: () {
+              final favCubit = context.read<FavouriteCubit>();
+              if (isFavourite) {
+                favCubit.deleteFavorite(widget.city);
+              } else {
+                favCubit.addFavorite(widget.city);
+              }
+              setState(() => isFavourite = !isFavourite);
+            },
+            icon: Icon(
+              isFavourite ? Icons.favorite : Icons.favorite_border,
+              color: Colors.white,
+            ),
+          ),
+        ),
       ]),
-      Text(widget.city.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 50,
-            fontWeight: FontWeight.w300,
-            color: Colors.white,
-          )),
+      Text(
+        widget.city.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 50,
+          fontWeight: FontWeight.w300,
+          color: Colors.white,
+        ),
+      ),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         Column(children: [
           const Text('Sunrise',

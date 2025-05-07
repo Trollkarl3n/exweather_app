@@ -1,30 +1,76 @@
-import 'package:exweather_app/utils/extensions.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../models/favourite.dart';
-
-part 'favourite_state.dart';
+import 'favourite_state.dart';
 
 class FavouriteCubit extends Cubit<FavouriteState> {
   FavouriteCubit() : super(FavouriteInitial());
-  final List<Favourite> _favoriteList = [];
+
+  final _firestore = FirebaseFirestore.instance;
+  final _auth = FirebaseAuth.instance;
+
+  List<Favourite> _favoriteList = [];
 
   Future<void> getFavorite() async {
-    emit(FavouriteLoaded(favoriteList: _favoriteList));
+    if (_auth.currentUser == null) return;
+    final uid = _auth.currentUser!.uid;
+
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('favourites')
+        .get();
+
+    _favoriteList = snapshot.docs
+        .map((doc) => Favourite(city: doc['city']))
+        .toList();
+
+    emit(FavouriteLoaded(favoriteList: List.from(_favoriteList)));
   }
 
   Future<void> addFavorite(String city) async {
-    bool isExist = _favoriteList.any((element) => element.city.contains(city));
-    if (!isExist) {
-      _favoriteList.add(Favourite(city: city.capitalize()));
+    if (_auth.currentUser == null) return;
+    final uid = _auth.currentUser!.uid;
+
+    final exists = await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('favourites')
+        .where('city', isEqualTo: city)
+        .get();
+
+    if (exists.docs.isEmpty) {
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('favourites')
+          .add({'city': city});
     }
-    emit(FavouriteLoaded(favoriteList: _favoriteList));
+
+    await getFavorite();
   }
 
   Future<void> deleteFavorite(String city) async {
-    _favoriteList
-        .removeWhere((item) => item.city.toUpperCase() == city.toUpperCase());
-    emit(FavouriteLoaded(favoriteList: _favoriteList));
+    if (_auth.currentUser == null) return;
+    final uid = _auth.currentUser!.uid;
+
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('favourites')
+        .where('city', isEqualTo: city)
+        .get();
+
+    for (var doc in snapshot.docs) {
+      await doc.reference.delete();
+    }
+
+    await getFavorite();
+  }
+
+  bool isFavorite(String city) {
+    return _favoriteList.any(
+            (fav) => fav.city.toLowerCase() == city.toLowerCase());
   }
 }

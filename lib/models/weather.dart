@@ -40,7 +40,8 @@ class Weather {
     var cloudiness = dailyForecast['clouds']['all'];
     var dt = dailyForecast['dt'];
 
-    var now = DateTime.fromMillisecondsSinceEpoch(dt * 1000);
+    const cetOffset = Duration(hours: 2);
+    var now = DateTime.fromMillisecondsSinceEpoch(dt * 1000).add(cetOffset);
     var sunrise = now.subtract(const Duration(hours: 6));
     var sunset = now.add(const Duration(hours: 6));
 

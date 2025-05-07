@@ -1,66 +1,19 @@
 import 'dart:convert';
-
 import 'package:http/http.dart' as http;
-
 import '../models/forecast.dart';
 import '../models/location.dart';
-import 'constants.dart';
+import '../services/constants.dart';
 
-abstract class IWeatherApi {
-  Future<Forecast> getWeather(Location location);
-  Future<Location> getLocation(String city);
-}
+class WeatherApi {
+  final http.Client client;
 
-class WeatherApi extends IWeatherApi {
-  final http.Client httpClient;
+  WeatherApi(this.client);
 
-  WeatherApi(this.httpClient);
-
-  @override
-  Future<Location> getLocation(String city) async {
-    final requestUrl = '$endPointUrl/weather?q=$city&APPID=$apiKey';
-    print("Location request URL: $requestUrl");
+  Future<Forecast> getWeather(String cityName) async {
     try {
-      final response = await httpClient.get(Uri.parse(requestUrl));
-
-      if (response.statusCode != 200) {
-        print("Error response: ${response.body}");
-        throw Exception(
-            'error retrieving location for city $city: ${response.statusCode}');
-      }
-
-      return Location.fromJson(jsonDecode(response.body));
-    } catch (e) {
-      print("Error in getLocation: $e");
-      rethrow;
-    }
-  }
-
-  @override
-  Future<Forecast> getWeather(Location location) async {
-    final requestUrl =
-        '$endPointUrl/forecast?lat=${location.latitude}&lon=${location.longitude}&APPID=$apiKey';
-    print("Weather request URL: $requestUrl");
-
-    try {
-      final response = await httpClient.get(Uri.parse(requestUrl));
-
-      if (response.statusCode != 200) {
-        print("Error response: ${response.body}");
-        throw Exception('error retrieving weather: ${response.statusCode}');
-      }
-
-      final currentWeatherUrl =
-          '$endPointUrl/weather?lat=${location.latitude}&lon=${location.longitude}&APPID=$apiKey';
-      final currentResponse = await httpClient.get(Uri.parse(currentWeatherUrl));
-
-      if (currentResponse.statusCode != 200) {
-        print("Error response: ${currentResponse.body}");
-        throw Exception('error retrieving current weather: ${currentResponse.statusCode}');
-      }
-
-      final forecastData = jsonDecode(response.body);
-      final currentData = jsonDecode(currentResponse.body);
+      final location = await getLocation(cityName);
+      final forecastData = await _getForecast(location);
+      final currentData = await _getCurrent(location);
 
       final combinedData = {
         'list': forecastData['list'],
@@ -77,11 +30,42 @@ class WeatherApi extends IWeatherApi {
       };
 
       final forecast = Forecast.fromJson(combinedData);
-      forecast.city = location.city;
       return forecast;
     } catch (e) {
-      print("Error in getWeather: $e");
-      rethrow;
+      throw Exception('Error fetching weather data: $e');
     }
+  }
+
+  Future<Location> getLocation(String cityName) async {
+    final url = Uri.parse('$endPointUrl/weather?q=$cityName&appid=$apiKey');
+    final response = await client.get(url);
+    if (response.statusCode != 200) {
+      throw Exception('Error getting location: ${response.body}');
+    }
+
+    final data = jsonDecode(response.body);
+    return Location.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>> _getCurrent(Location location) async {
+    final url = Uri.parse(
+        '$endPointUrl/weather?lat=${location.latitude}&lon=${location.longitude}&appid=$apiKey');
+    final response = await client.get(url);
+    if (response.statusCode != 200) {
+      throw Exception('Error getting current weather: ${response.body}');
+    }
+
+    return jsonDecode(response.body);
+  }
+
+  Future<Map<String, dynamic>> _getForecast(Location location) async {
+    final url = Uri.parse(
+        '$endPointUrl/forecast?lat=${location.latitude}&lon=${location.longitude}&appid=$apiKey');
+    final response = await client.get(url);
+    if (response.statusCode != 200) {
+      throw Exception('Error getting forecast: ${response.body}');
+    }
+
+    return jsonDecode(response.body);
   }
 }

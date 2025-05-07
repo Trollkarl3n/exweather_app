@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../cubit/weather_cubit.dart';
+import '../cubit/favourite_cubit.dart';
+import '../cubit/favourite_state.dart';
 import '../models/forecast.dart';
 import '../models/weather.dart';
+import 'settings_page.dart';
 import 'favourite_page.dart';
 import 'widgets/city_information_widget.dart';
 import 'widgets/city_entry_widget.dart';
@@ -13,6 +17,7 @@ import 'widgets/indicator_widget.dart';
 import 'widgets/last_update_widget.dart';
 import 'widgets/weather_description_widget.dart';
 import 'widgets/weather_summary_widget.dart';
+import 'widgets/weather_map_widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -44,17 +49,23 @@ class _HomePageState extends State<HomePage> {
           backgroundColor: Colors.blueGrey.shade800,
           actions: <Widget>[
             IconButton(
-              icon: const Icon(Icons.list),
-              onPressed: () async {
-                isSelectedDate = false;
+              icon: const Icon(Icons.settings),
+              onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const FavouritePage(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const SettingsPage()),
                 );
               },
-            )
+            ),
+            IconButton(
+              icon: const Icon(Icons.list),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const FavouritePage()),
+                );
+              },
+            ),
           ],
         ),
         body: _buildGradientContainer(
@@ -62,7 +73,7 @@ class _HomePageState extends State<HomePage> {
                 ? WeatherCondition.clear
                 : _forecast!.current.condition,
             _forecast == null ? false : _forecast!.isDayTime,
-            Container(
+            SizedBox(
                 height: MediaQuery.of(context).size.height,
                 child: RefreshIndicator(
                     color: Colors.transparent,
@@ -73,6 +84,7 @@ class _HomePageState extends State<HomePage> {
                             .forecast),
                     child: ListView(children: <Widget>[
                       CityEntryWidget(callBackFunction: searchCity),
+                      buildFavoriteCityList(context),
                       BlocBuilder<WeatherCubit, WeatherState>(
                           builder: (context, state) {
                             if (state is WeatherInitial) {
@@ -102,12 +114,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget buildColumnWithData() {
+    final isGuest = FirebaseAuth.instance.currentUser?.isAnonymous ?? false;
+
     return Column(children: [
+      if (isGuest)
+        const Padding(
+          padding: EdgeInsets.all(8),
+          child: Text(
+            "Guest Mode – changes won’t be saved",
+            style: TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
+          ),
+        ),
       CityInformationWidget(
-          city: _forecast!.city,
-          sunrise: _forecast!.sunrise,
-          sunset: _forecast!.sunset,
-          isFavourite: _forecast!.isFavourite),
+        city: _forecast!.city,
+        sunrise: _forecast!.sunrise,
+        sunset: _forecast!.sunset,
+      ),
       const SizedBox(height: 40),
       WeatherSummaryWidget(
           date: _forecast!.date,
@@ -119,7 +141,15 @@ class _HomePageState extends State<HomePage> {
           weatherDescription: _forecast!.current.description),
       const SizedBox(height: 40),
       buildDailySummary(_forecast!.daily),
-      LastUpdatedWidget(lastUpdatedOn: _forecast!.lastUpdated)
+      LastUpdatedWidget(lastUpdatedOn: _forecast!.lastUpdated),
+      if (_forecast?.lat != null && _forecast?.lon != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: WeatherMapWidget(
+            latitude: _forecast!.lat,
+            longitude: _forecast!.lon,
+          ),
+        ),
     ]);
   }
 
@@ -156,8 +186,49 @@ class _HomePageState extends State<HomePage> {
       return _refreshCompleter!.future;
     } else {
       return BlocProvider.of<WeatherCubit>(context)
-          .getWeather(forecast.city, forecast.isFavourite);
+          .getWeather(forecast.city, false);
     }
+  }
+
+  Widget buildFavoriteCityList(BuildContext context) {
+    final isGuest = FirebaseAuth.instance.currentUser?.isAnonymous ?? false;
+    if (isGuest) return const SizedBox.shrink();
+
+    return BlocBuilder<FavouriteCubit, FavouriteState>(
+      builder: (context, state) {
+        if (state is FavouriteLoaded && state.favoriteList.isNotEmpty) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(10),
+                child: Text(
+                  "Favorite Cities",
+                  style: TextStyle(fontSize: 18, color: Colors.white70),
+                ),
+              ),
+              Wrap(
+                spacing: 10,
+                children: state.favoriteList.map((fav) {
+                  return ActionChip(
+                    label: Text(fav.city),
+                    onPressed: () {
+                      BlocProvider.of<WeatherCubit>(context)
+                          .getWeather(fav.city, true);
+                    },
+                    backgroundColor: Colors.white24,
+                    labelStyle: const TextStyle(color: Colors.white),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+            ],
+          );
+        } else {
+          return const SizedBox.shrink();
+        }
+      },
+    );
   }
 
   GradientContainerWidget _buildGradientContainer(

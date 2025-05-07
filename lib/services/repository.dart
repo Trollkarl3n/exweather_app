@@ -1,5 +1,4 @@
 import 'package:exweather_app/services/weather_api.dart';
-
 import '../models/forecast.dart';
 
 abstract class IRepository {
@@ -7,7 +6,7 @@ abstract class IRepository {
 }
 
 class Repository extends IRepository {
-  final IWeatherApi weatherApi;
+  final WeatherApi weatherApi;
 
   Repository(this.weatherApi);
 
@@ -15,7 +14,7 @@ class Repository extends IRepository {
   Future<Forecast> getWeather(String city) async {
     try {
       final location = await weatherApi.getLocation(city);
-      final forecast = await weatherApi.getWeather(location);
+      final forecast = await weatherApi.getWeather(location.city);
       forecast.city = location.city;
       return forecast;
     } catch (e) {

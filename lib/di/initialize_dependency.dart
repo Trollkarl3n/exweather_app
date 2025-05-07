@@ -10,8 +10,8 @@ Future<void> initializeDependency() async {
   injector.registerSingleton<http.Client>(http.Client());
 
   injector
-      .registerSingleton<IWeatherApi>(WeatherApi(injector.get<http.Client>()));
+      .registerSingleton<WeatherApi>(WeatherApi(injector.get<http.Client>()));
 
   injector
-      .registerSingleton<IRepository>(Repository(injector.get<IWeatherApi>()));
+      .registerSingleton<IRepository>(Repository(injector.get<WeatherApi>()));
 }
