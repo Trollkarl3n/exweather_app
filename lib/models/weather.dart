@@ -1,6 +1,5 @@
 import 'package:exweather_app/utils/extensions.dart';
 import 'package:intl/intl.dart';
-
 import '../utils/temp_converter.dart';
 
 enum WeatherCondition {
@@ -21,80 +20,130 @@ class Weather {
   final String temp;
   final String feelLikeTemp;
   final int cloudiness;
+  final int humidity;
+  final double windSpeed;
+  final int pressure;
   final String date;
   final String sunrise;
   final String sunset;
 
-  Weather(
-      {required this.condition,
-        required this.description,
-        required this.temp,
-        required this.feelLikeTemp,
-        required this.cloudiness,
-        required this.date,
-        required this.sunrise,
-        required this.sunset});
+  Weather({
+    required this.condition,
+    required this.description,
+    required this.temp,
+    required this.feelLikeTemp,
+    required this.cloudiness,
+    required this.humidity,
+    required this.windSpeed,
+    required this.pressure,
+    required this.date,
+    required this.sunrise,
+    required this.sunset,
+  });
 
-  static Weather fromDailyJson(dynamic dailyForecast) {
-    var weather = dailyForecast['weather'][0];
-    var cloudiness = dailyForecast['clouds']['all'];
-    var dt = dailyForecast['dt'];
+  static Weather fromCurrentJson(dynamic json, String sunrise, String sunset) {
+    try {
+      var weather = (json['weather'] != null && json['weather'].isNotEmpty)
+          ? json['weather'][0]
+          : {'main': 'Clear', 'description': 'clear sky'};
 
-    const cetOffset = Duration(hours: 2);
-    var now = DateTime.fromMillisecondsSinceEpoch(dt * 1000).add(cetOffset);
-    var sunrise = now.subtract(const Duration(hours: 6));
-    var sunset = now.add(const Duration(hours: 6));
+      var main = json['main'] ?? {};
+      var wind = json['wind'] ?? {};
+      var clouds = json['clouds'] ?? {};
+      var dt = json['dt'] ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    return Weather(
-        condition: mapStringToWeatherCondition(weather['main'], cloudiness),
-        description: weather['description'].toString().capitalize(),
-        cloudiness: cloudiness,
-        temp:
-        '${formatTemperature(TempConverter.kelvinToCelsius(double.parse(dailyForecast['main']['temp'].toString())))}°',
-        date: DateFormat('d EEE')
-            .format(DateTime.fromMillisecondsSinceEpoch(dt * 1000)),
-        sunrise: DateFormat.jm().format(sunrise),
-        sunset: DateFormat.jm().format(sunset),
-        feelLikeTemp:
-        '${formatTemperature(TempConverter.kelvinToCelsius(double.parse(dailyForecast['main']['feels_like'].toString())))}°');
+      return Weather(
+        condition: mapStringToWeatherCondition(
+          weather['main'] ?? 'Clear',
+          int.tryParse(clouds['all']?.toString() ?? '') ?? 0,
+        ),
+        description: (weather['description'] ?? 'clear sky').toString().capitalize(),
+        temp: '${formatTemperature(TempConverter.kelvinToCelsius(_toDouble(main['temp'], fallback: 273.15)))}°',
+        feelLikeTemp: '${formatTemperature(TempConverter.kelvinToCelsius(_toDouble(main['feels_like'], fallback: 273.15)))}°',
+        cloudiness: int.tryParse(clouds['all']?.toString() ?? '') ?? 0,
+        humidity: int.tryParse(main['humidity']?.toString() ?? '') ?? 0,
+        windSpeed: _toDouble(wind['speed'], fallback: 0.0),
+        pressure: int.tryParse(main['pressure']?.toString() ?? '') ?? 1013,
+        date: DateFormat('d EEE').format(
+          DateTime.fromMillisecondsSinceEpoch(dt * 1000),
+        ),
+        sunrise: sunrise,
+        sunset: sunset,
+      );
+    } catch (e) {
+      print("❌ Error in fromCurrentJson: $e");
+      print("⚠️ Raw JSON: $json");
+      rethrow;
+    }
   }
 
-  static String formatTemperature(double t) {
-    var temp = (t == null ? '' : t.round().toString());
-    return temp;
+  static Weather fromDailyJson(dynamic json, String sunrise, String sunset) {
+    try {
+      var weather = (json['weather'] != null && json['weather'].isNotEmpty)
+          ? json['weather'][0]
+          : {'main': 'Clear', 'description': 'clear sky'};
+
+      var main = json['main'] ?? {};
+      var wind = json['wind'] ?? {};
+      var clouds = json['clouds'] ?? {};
+      var dt = json['dt'] ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+      return Weather(
+        condition: mapStringToWeatherCondition(
+          weather['main'] ?? 'Clear',
+          int.tryParse(clouds['all']?.toString() ?? '') ?? 0,
+        ),
+        description: (weather['description'] ?? 'clear sky').toString().capitalize(),
+        temp: '${formatTemperature(TempConverter.kelvinToCelsius(_toDouble(main['temp'], fallback: 273.15)))}°',
+        feelLikeTemp: '${formatTemperature(TempConverter.kelvinToCelsius(_toDouble(main['feels_like'], fallback: 273.15)))}°',
+        cloudiness: int.tryParse(clouds['all']?.toString() ?? '') ?? 0,
+        humidity: int.tryParse(main['humidity']?.toString() ?? '') ?? 0,
+        windSpeed: _toDouble(wind['speed'], fallback: 0.0),
+        pressure: int.tryParse(main['pressure']?.toString() ?? '') ?? 1013,
+        date: DateFormat('d EEE').format(
+          DateTime.fromMillisecondsSinceEpoch(dt * 1000),
+        ),
+        sunrise: sunrise,
+        sunset: sunset,
+      );
+    } catch (e) {
+      print("❌ Error in fromDailyJson: $e");
+      print("⚠️ Raw JSON: $json");
+      rethrow;
+    }
   }
 
-  static WeatherCondition mapStringToWeatherCondition(
-      String input, int cloudiness) {
-    WeatherCondition condition;
+  static double _toDouble(dynamic value, {required double fallback}) {
+    if (value == null) return fallback;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    return double.tryParse(value.toString()) ?? fallback;
+  }
+
+  static String formatTemperature(double temp) {
+    return temp.round().toString();
+  }
+
+  static WeatherCondition mapStringToWeatherCondition(String input, int cloudiness) {
     switch (input) {
       case 'Thunderstorm':
-        condition = WeatherCondition.thunderstorm;
-        break;
+        return WeatherCondition.thunderstorm;
       case 'Drizzle':
-        condition = WeatherCondition.drizzle;
-        break;
+        return WeatherCondition.drizzle;
       case 'Rain':
-        condition = WeatherCondition.rain;
-        break;
+        return WeatherCondition.rain;
       case 'Snow':
-        condition = WeatherCondition.snow;
-        break;
+        return WeatherCondition.snow;
       case 'Clear':
-        condition = WeatherCondition.clear;
-        break;
+        return WeatherCondition.clear;
       case 'Clouds':
-        condition = (cloudiness >= 85)
+        return cloudiness >= 85
             ? WeatherCondition.heavyCloud
             : WeatherCondition.lightCloud;
-        break;
       case 'Mist':
-        condition = WeatherCondition.mist;
-        break;
+        return WeatherCondition.mist;
       default:
-        condition = WeatherCondition.unknown;
+        return WeatherCondition.unknown;
     }
-
-    return condition;
   }
 }

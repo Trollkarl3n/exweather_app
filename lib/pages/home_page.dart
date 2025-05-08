@@ -19,6 +19,8 @@ import 'widgets/weather_description_widget.dart';
 import 'widgets/weather_summary_widget.dart';
 import 'widgets/weather_map_widget.dart';
 
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -26,7 +28,7 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with RouteAware {
   Completer<void>? _refreshCompleter;
   Forecast? _forecast;
   bool isSelectedDate = false;
@@ -37,6 +39,32 @@ class _HomePageState extends State<HomePage> {
     _refreshCompleter = Completer<void>();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    final state = context.read<WeatherCubit>().state;
+    if (state is WeatherLoaded) {
+      setState(() {
+        _forecast = state.forecast;
+        isSelectedDate = false;
+      });
+    }
+  }
+
   void searchCity() {
     isSelectedDate = false;
     _forecast = null;
@@ -45,149 +73,245 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.blueGrey.shade800,
-          actions: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SettingsPage()),
-                );
-              },
+      appBar: AppBar(
+        backgroundColor: Colors.blueGrey.shade800,
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsPage()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.list),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FavouritePage()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: BlocBuilder<WeatherCubit, WeatherState>(
+        builder: (context, state) {
+          if (state is WeatherInitial) {
+            return _buildGradientContainer(
+              WeatherCondition.clear,
+              false,
+              Column(
+                children: [
+                  const SizedBox(height: 20),
+                  CityEntryWidget(callBackFunction: searchCity),
+                  buildMessageText(state.message),
+                ],
+              ),
+            );
+          } else if (state is WeatherLoading) {
+            return _buildGradientContainer(
+              WeatherCondition.clear,
+              false,
+              Column(
+                children: [
+                  const SizedBox(height: 20),
+                  CityEntryWidget(callBackFunction: searchCity),
+                  const IndicatorWidget(),
+                ],
+              ),
+            );
+          } else if (state is WeatherLoaded) {
+            _forecast = state.forecast;
+            isSelectedDate = false;
+            return _buildGradientContainer(
+              _forecast!.current.condition,
+              _forecast!.isDayTime,
+              buildContent(),
+            );
+          } else if (state is WeatherError) {
+            return _buildGradientContainer(
+              WeatherCondition.clear,
+              false,
+              Column(
+                children: [
+                  const SizedBox(height: 20),
+                  CityEntryWidget(callBackFunction: searchCity),
+                  buildMessageText(state.message),
+                ],
+              ),
+            );
+          } else {
+            return _buildGradientContainer(
+              WeatherCondition.clear,
+              false,
+              Column(
+                children: [
+                  const SizedBox(height: 20),
+                  CityEntryWidget(callBackFunction: searchCity),
+                  const IndicatorWidget(),
+                ],
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Widget buildContent() {
+    final isGuest = FirebaseAuth.instance.currentUser?.isAnonymous ?? false;
+
+    return SizedBox(
+      height: MediaQuery.of(context).size.height,
+      child: RefreshIndicator(
+        color: Colors.transparent,
+        backgroundColor: Colors.transparent,
+        onRefresh: () => refreshWeather(_forecast!),
+        child: ListView(
+          children: <Widget>[
+            CityEntryWidget(callBackFunction: searchCity),
+            buildFavoriteCityList(context),
+            if (isGuest)
+              const Padding(
+                padding: EdgeInsets.all(8),
+                child: Text(
+                  "Guest Mode – changes won’t be saved",
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            CityInformationWidget(
+              city: _forecast!.city,
+              sunrise: _forecast!.current.sunrise,
+              sunset: _forecast!.current.sunset,
             ),
-            IconButton(
-              icon: const Icon(Icons.list),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const FavouritePage()),
-                );
-              },
+            const SizedBox(height: 40),
+            WeatherSummaryWidget(
+              date: _forecast!.date,
+              condition: _forecast!.current.condition,
+              temp: _forecast!.current.temp,
+              feelsLike: _forecast!.current.feelLikeTemp,
             ),
+            const SizedBox(height: 20),
+            WeatherDescriptionWidget(
+              weatherDescription: _forecast!.current.description,
+            ),
+            const SizedBox(height: 40),
+            buildTodayDetails(),
+            buildDailySummary(_forecast!.daily),
+            LastUpdatedWidget(lastUpdatedOn: _forecast!.lastUpdated),
+            if (_forecast?.lat != null && _forecast?.lon != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Weather Map",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: SizedBox(
+                        height: 200,
+                        child: WeatherMapWidget(
+                          latitude: _forecast!.lat,
+                          longitude: _forecast!.lon,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
-        body: _buildGradientContainer(
-            _forecast == null
-                ? WeatherCondition.clear
-                : _forecast!.current.condition,
-            _forecast == null ? false : _forecast!.isDayTime,
-            SizedBox(
-                height: MediaQuery.of(context).size.height,
-                child: RefreshIndicator(
-                    color: Colors.transparent,
-                    backgroundColor: Colors.transparent,
-                    onRefresh: () => refreshWeather(
-                        (BlocProvider.of<WeatherCubit>(context).state
-                        as WeatherLoaded)
-                            .forecast),
-                    child: ListView(children: <Widget>[
-                      CityEntryWidget(callBackFunction: searchCity),
-                      buildFavoriteCityList(context),
-                      BlocBuilder<WeatherCubit, WeatherState>(
-                          builder: (context, state) {
-                            if (state is WeatherInitial) {
-                              return buildMessageText(state.message);
-                            } else if (state is WeatherLoading) {
-                              return const IndicatorWidget();
-                            } else if (state is WeatherLoaded) {
-                              if (!isSelectedDate) {
-                                _forecast = state.forecast;
-                              }
-                              return buildColumnWithData();
-                            } else if (state is WeatherError) {
-                              return buildMessageText(state.message);
-                            } else {
-                              return const IndicatorWidget();
-                            }
-                          })
-                    ])))));
+      ),
+    );
+  }
+
+  Widget buildTodayDetails() {
+    final details = [
+      {"label": "Cloudiness", "value": "${_forecast!.current.cloudiness}%"},
+      {"label": "Humidity", "value": "${_forecast!.current.humidity}%"},
+      {"label": "Pressure", "value": "${_forecast!.current.pressure} hPa"},
+      {"label": "Feels Like", "value": _forecast!.current.feelLikeTemp},
+      {"label": "Wind", "value": "${_forecast!.current.windSpeed} m/s"},
+
+
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Today's Details",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: details.map((item) {
+              return Container(
+                width: MediaQuery.of(context).size.width / 2 - 22,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item['label']!, style: const TextStyle(fontSize: 14, color: Colors.white70)),
+                    const SizedBox(height: 4),
+                    Text(item['value']!, style: const TextStyle(fontSize: 16, color: Colors.white)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget buildMessageText(String message) {
     return Padding(
-        padding: const EdgeInsets.only(top: 30),
-        child: Center(
-            child: Text(message,
-                style: const TextStyle(fontSize: 21, color: Colors.white))));
-  }
-
-  Widget buildColumnWithData() {
-    final isGuest = FirebaseAuth.instance.currentUser?.isAnonymous ?? false;
-
-    return Column(children: [
-      if (isGuest)
-        const Padding(
-          padding: EdgeInsets.all(8),
-          child: Text(
-            "Guest Mode – changes won’t be saved",
-            style: TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
-          ),
+      padding: const EdgeInsets.only(top: 30),
+      child: Center(
+        child: Text(
+          message,
+          style: const TextStyle(fontSize: 21, color: Colors.white),
         ),
-      CityInformationWidget(
-        city: _forecast!.city,
-        sunrise: _forecast!.sunrise,
-        sunset: _forecast!.sunset,
       ),
-      const SizedBox(height: 40),
-      WeatherSummaryWidget(
-          date: _forecast!.date,
-          condition: _forecast!.current.condition,
-          temp: _forecast!.current.temp,
-          feelsLike: _forecast!.current.feelLikeTemp),
-      const SizedBox(height: 20),
-      WeatherDescriptionWidget(
-          weatherDescription: _forecast!.current.description),
-      const SizedBox(height: 40),
-      buildDailySummary(_forecast!.daily),
-      LastUpdatedWidget(lastUpdatedOn: _forecast!.lastUpdated),
-      if (_forecast?.lat != null && _forecast?.lon != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 20),
-          child: WeatherMapWidget(
-            latitude: _forecast!.lat,
-            longitude: _forecast!.lon,
-          ),
-        ),
-    ]);
+    );
   }
 
   Widget buildDailySummary(List<Weather> dailyForecast) {
     return Container(
-        height: 120,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: ListView.builder(
-            physics: const BouncingScrollPhysics(),
-            scrollDirection: Axis.horizontal,
-            itemCount: dailyForecast.length,
-            itemBuilder: (BuildContext context, int index) {
-              return InkWell(
-                  onTap: () {
-                    isSelectedDate = true;
-                    _forecast!.date = dailyForecast[index].date;
-                    _forecast!.sunrise = dailyForecast[index].sunrise;
-                    _forecast!.sunset = dailyForecast[index].sunset;
-                    _forecast!.current = dailyForecast[index];
-
-                    _refreshCompleter?.complete();
-                    _refreshCompleter = Completer();
-                    refreshWeather(_forecast!);
-                  },
-                  child: DailySummaryWidget(weather: dailyForecast[index]));
-            }));
+      height: 120,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: ListView.builder(
+        physics: const BouncingScrollPhysics(),
+        scrollDirection: Axis.horizontal,
+        itemCount: dailyForecast.length,
+        itemBuilder: (BuildContext context, int index) {
+          return DailySummaryWidget(weather: dailyForecast[index]);
+        },
+      ),
+    );
   }
 
   Future<void> refreshWeather(Forecast forecast) {
-    if (isSelectedDate) {
-      setState(() {
-        _forecast = forecast;
-      });
-      return _refreshCompleter!.future;
-    } else {
-      return BlocProvider.of<WeatherCubit>(context)
-          .getWeather(forecast.city, false);
-    }
+    return BlocProvider.of<WeatherCubit>(context)
+        .getWeather(forecast.city, false);
   }
 
   Widget buildFavoriteCityList(BuildContext context) {
@@ -233,36 +357,25 @@ class _HomePageState extends State<HomePage> {
 
   GradientContainerWidget _buildGradientContainer(
       WeatherCondition condition, bool isDayTime, Widget child) {
-    GradientContainerWidget container;
     if (!isDayTime) {
-      container = GradientContainerWidget(color: Colors.blueGrey, child: child);
-    } else {
-      switch (condition) {
-        case WeatherCondition.clear:
-        case WeatherCondition.lightCloud:
-          container =
-              GradientContainerWidget(color: Colors.yellow, child: child);
-          break;
-        case WeatherCondition.rain:
-        case WeatherCondition.drizzle:
-        case WeatherCondition.mist:
-        case WeatherCondition.heavyCloud:
-          container =
-              GradientContainerWidget(color: Colors.indigo, child: child);
-          break;
-        case WeatherCondition.snow:
-          container =
-              GradientContainerWidget(color: Colors.lightBlue, child: child);
-          break;
-        case WeatherCondition.thunderstorm:
-          container =
-              GradientContainerWidget(color: Colors.deepPurple, child: child);
-          break;
-        default:
-          container =
-              GradientContainerWidget(color: Colors.lightBlue, child: child);
-      }
+      return GradientContainerWidget(color: Colors.blueGrey, child: child);
     }
-    return container;
+
+    switch (condition) {
+      case WeatherCondition.clear:
+      case WeatherCondition.lightCloud:
+        return GradientContainerWidget(color: Colors.yellow, child: child);
+      case WeatherCondition.rain:
+      case WeatherCondition.drizzle:
+      case WeatherCondition.mist:
+      case WeatherCondition.heavyCloud:
+        return GradientContainerWidget(color: Colors.indigo, child: child);
+      case WeatherCondition.snow:
+        return GradientContainerWidget(color: Colors.lightBlue, child: child);
+      case WeatherCondition.thunderstorm:
+        return GradientContainerWidget(color: Colors.deepPurple, child: child);
+      default:
+        return GradientContainerWidget(color: Colors.lightBlue, child: child);
+    }
   }
 }
