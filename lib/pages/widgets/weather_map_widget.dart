@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'package:exweather_app/services/constants.dart'; // Make sure this points to your constants file
+
 class WeatherMapWidget extends StatelessWidget {
   final double latitude;
   final double longitude;
@@ -24,7 +26,7 @@ class WeatherMapWidget extends StatelessWidget {
         children: [
           TileLayer(
             urlTemplate:
-            'https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=YOUR_API_KEY',
+            'https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=$apiKey',
             userAgentPackageName: 'com.example.weatherapp',
           ),
           TileLayer(
